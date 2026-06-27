@@ -1,6 +1,7 @@
 package com.pokedex.app.presentation.screens.team
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -103,19 +104,38 @@ private fun MaterialTeamCard(teamMember: TeamMember, onRemove: () -> Unit) {
                 )
                 .padding(12.dp)
         ) {
+            // Container da Imagem (Sprite do Pokémon ou Foto Capturada)
             Box(
                 modifier        = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(typeClr.copy(alpha = 0.20f)),
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(typeClr.copy(alpha = 0.30f))
+                    .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model              = pokemon.imageUrl,
-                    contentDescription = pokemon.name,
-                    contentScale       = ContentScale.Fit,
-                    modifier           = Modifier.size(60.dp)
-                )
+                if (teamMember.photoPath != null) {
+                    AsyncImage(
+                        model              = teamMember.photoPath,
+                        contentDescription = "Foto da captura",
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize()
+                    )
+                    // Pequeno overlay do sprite do pokemon no canto
+                    Box(modifier = Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.BottomEnd) {
+                        AsyncImage(
+                            model = pokemon.imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier.size(30.dp).background(Color.White.copy(0.4f), CircleShape)
+                        )
+                    }
+                } else {
+                    AsyncImage(
+                        model              = pokemon.imageUrl,
+                        contentDescription = pokemon.name,
+                        contentScale       = ContentScale.Fit,
+                        modifier           = Modifier.size(65.dp)
+                    )
+                }
             }
 
             Spacer(Modifier.width(14.dp))
@@ -127,51 +147,33 @@ private fun MaterialTeamCard(teamMember: TeamMember, onRemove: () -> Unit) {
                     color      = Color.White.copy(0.7f)
                 )
                 Text(
-                    text       = pokemon.name,
+                    text       = pokemon.name.replaceFirstChar { it.uppercase() },
                     fontSize   = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color      = Color.White
                 )
-                Spacer(Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    pokemon.types.forEach { TypeBadge(it) }
-                }
-
+                
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(vertical = 4.dp)
                 ) {
                     Icon(
                         Icons.Default.LocationOn,
                         contentDescription = null,
                         tint = Color.White.copy(0.85f),
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(12.dp)
                     )
                     Text(
-                        text = "Capturado em: ${teamMember.capturedLocation}",
-                        fontSize = 12.sp,
-                        color = Color.White.copy(0.85f)
+                        text = teamMember.capturedLocation,
+                        fontSize = 11.sp,
+                        color = Color.White.copy(0.85f),
+                        maxLines = 1
                     )
                 }
 
-                if (teamMember.photoPath != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(top = 2.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.PhotoCamera,
-                            contentDescription = null,
-                            tint = Color.White.copy(0.85f),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "Foto arquivada",
-                            fontSize = 11.sp,
-                            color = Color.White.copy(0.85f)
-                        )
-                    }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    pokemon.types.forEach { TypeBadge(it) }
                 }
             }
 

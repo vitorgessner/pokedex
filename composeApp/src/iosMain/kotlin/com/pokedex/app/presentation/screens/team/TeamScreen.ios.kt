@@ -1,9 +1,11 @@
 package com.pokedex.app.presentation.screens.team
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -32,7 +34,6 @@ actual fun PlatformTeamContent(
             .fillMaxSize()
             .background(iosBackground)
     ) {
-        // Cabeçalho estilo iOS — título grande à esquerda
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -127,65 +128,77 @@ private fun IOSTeamRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier          = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
+            // Container da Imagem estilo iOS
             Box(
                 modifier        = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(typeClr.copy(alpha = 0.18f)),
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(typeClr.copy(alpha = 0.12f))
+                    .border(0.5.dp, Color.LightGray.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model              = pokemon.imageUrl,
-                    contentDescription = pokemon.name,
-                    contentScale       = ContentScale.Fit,
-                    modifier           = Modifier.size(44.dp)
-                )
+                if (member.photoPath != null) {
+                    AsyncImage(
+                        model              = member.photoPath,
+                        contentDescription = "Captura",
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize()
+                    )
+                    // Miniatura do Pokémon no canto
+                    Box(modifier = Modifier.fillMaxSize().padding(2.dp), contentAlignment = Alignment.BottomEnd) {
+                        AsyncImage(
+                            model = pokemon.imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp).background(Color.White.copy(0.7f), CircleShape)
+                        )
+                    }
+                } else {
+                    AsyncImage(
+                        model              = pokemon.imageUrl,
+                        contentDescription = pokemon.name,
+                        contentScale       = ContentScale.Fit,
+                        modifier           = Modifier.size(48.dp)
+                    )
+                }
             }
 
             Spacer(Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text       = pokemon.name,
+                    text       = pokemon.name.replaceFirstChar { it.uppercase() },
                     fontSize   = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     color      = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text     = pokemon.types.joinToString(" · ") {
-                        it.replaceFirstChar { c -> c.uppercase() }
-                    },
-                    fontSize = 13.sp,
-                    color    = MaterialTheme.colorScheme.onSurfaceVariant
+                    text     = "📍 ${member.capturedLocation}",
+                    fontSize = 12.sp,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
                 Text(
-                    text     = "Em: ${member.capturedLocation}",
+                    text     = pokemon.types.joinToString(" · ") { it.uppercase() },
                     fontSize = 11.sp,
-                    color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    fontWeight = FontWeight.Medium,
+                    color    = typeClr.copy(alpha = 0.8f)
                 )
-                if (member.photoPath != null) {
-                    Text(
-                        text     = "📸 Foto disponível",
-                        fontSize = 10.sp,
-                        color    = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
             }
 
             TextButton(
                 onClick = onRemove,
-                colors  = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFF3B30))
+                colors  = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFF3B30)),
+                contentPadding = PaddingValues(horizontal = 8.dp)
             ) {
-                Text("Remover", fontSize = 15.sp)
+                Text("Remover", fontSize = 14.sp)
             }
         }
 
         if (!isLast) {
-            Divider(
-                color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+            HorizontalDivider(
+                color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                 thickness = 0.5.dp,
-                modifier  = Modifier.padding(start = 82.dp)
+                modifier  = Modifier.padding(start = 88.dp)
             )
         }
     }

@@ -11,10 +11,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -27,16 +31,18 @@ import com.pokedex.app.domain.model.PokemonDetail
 import com.pokedex.app.presentation.components.StatBar
 import com.pokedex.app.presentation.components.TypeBadge
 import com.pokedex.app.presentation.screens.team.TeamViewModel
+import com.pokedex.app.presentation.screens.team.TeamMember
 import com.pokedex.app.presentation.theme.typeColor
 import dev.icerock.moko.geo.compose.BindLocationTrackerEffect
 import dev.icerock.moko.geo.compose.LocationTrackerAccuracy
 import dev.icerock.moko.geo.compose.rememberLocationTrackerFactory
 import dev.icerock.moko.permissions.Permission
+import dev.icerock.moko.permissions.location.LOCATION
+import dev.icerock.moko.permissions.camera.CAMERA
 import dev.icerock.moko.permissions.compose.BindEffect
 import dev.icerock.moko.permissions.compose.rememberPermissionsControllerFactory
-import dev.icerock.moko.permissions.location.LOCATION
-import com.preat.peekaboo.image.picker.SelectionMode
-import com.preat.peekaboo.image.picker.rememberImagePickerLauncher
+import com.preat.peekaboo.ui.camera.PeekabooCamera
+import com.preat.peekaboo.ui.camera.rememberPeekabooCameraState
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.Clock
@@ -50,7 +56,7 @@ fun DetailScreen(
     detailViewModel: DetailViewModel = viewModel { DetailViewModel() }
 ) {
     val uiState by detailViewModel.uiState.collectAsStateWithLifecycle()
-    val team by teamViewModel.uiState.collectAsStateWithLifecycle()
+    val teamState by teamViewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     val permissionsControllerFactory = rememberPermissionsControllerFactory()
@@ -71,16 +77,16 @@ fun DetailScreen(
     var locationName by remember { mutableStateOf("") }
     var isCapturingLocation by remember { mutableStateOf(false) }
     var permissionError by remember { mutableStateOf<String?>(null) }
+    var isCameraOpen by remember { mutableStateOf(false) }
 
-    val cameraLauncher = rememberImagePickerLauncher(
-        selectionMode = SelectionMode.Single,
-        scope = scope,
-        onResult = { byteArrays: List<ByteArray> ->
-            if (byteArrays.isNotEmpty()) {
+    val cameraState = rememberPeekabooCameraState(
+        onCapture = { byteArray ->
+            if (byteArray != null) {
                 scope.launch {
                     val fileName = "photo_${pokemonId}_${Clock.System.now().toEpochMilliseconds()}.jpg"
-                    val path = com.pokedex.app.di.AppModule.imageStorage.saveImage(fileName, byteArrays.first())
+                    val path = com.pokedex.app.di.AppModule.imageStorage.saveImage(fileName, byteArray)
                     capturedPhotoPath = path
+                    isCameraOpen = false
                 }
             }
         }
@@ -93,7 +99,10 @@ fun DetailScreen(
     if (showCaptureDialog && uiState is DetailUiState.Success) {
         val pokemon = (uiState as DetailUiState.Success).pokemon
         AlertDialog(
-            onDismissRequest = { showCaptureDialog = false },
+            onDismissRequest = { 
+                showCaptureDialog = false 
+                isCameraOpen = false
+            },
             title = { Text("Capturar Pokémon", style = MaterialTheme.typography.headlineSmall) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -101,40 +110,68 @@ fun DetailScreen(
                         Text(permissionError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
 
-                    // Preview da Foto / Botão de Câmera
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(160.dp)
-                            .border(2.dp, typeColor(pokemon.types.firstOrNull() ?: "normal"), RoundedCornerShape(12.dp))
-                            .clickable {
-                                scope.launch {
-                                    try {
-                                        cameraLauncher.launch()
-                                    } catch (e: Exception) {
-                                        permissionError = "Permissão de câmera negada."
-                                    }
-                                }
-                            },
+                            .height(200.dp)
+                            .border(2.dp, typeColor(pokemon.types.firstOrNull() ?: "normal"), RoundedCornerShape(12.dp)),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            if (capturedPhotoPath != null) {
+                            if (isCameraOpen) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    PeekabooCamera(
+                                        state = cameraState,
+                                        modifier = Modifier.fillMaxSize(),
+                                        permissionDeniedContent = {
+                                            Text("Acesso à câmera negado", Modifier.align(Alignment.Center))
+                                        }
+                                    )
+                                    Button(
+                                        onClick = { cameraState.capture() },
+                                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                                        shape = RoundedCornerShape(50)
+                                    ) {
+                                        Icon(Icons.Default.CameraAlt, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Tirar Foto")
+                                    }
+                                }
+                            } else if (capturedPhotoPath != null) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.CameraAlt, null, tint = MaterialTheme.colorScheme.primary)
-                                    Text("Foto capturada!", color = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.Default.CameraAlt, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
+                                    Text("Foto capturada!", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                    TextButton(onClick = { isCameraOpen = true }) {
+                                        Icon(Icons.Default.Refresh, null, Modifier.size(16.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Tirar outra")
+                                    }
                                 }
                             } else {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(40.dp))
-                                    Text("Tirar Foto do Treinador", style = MaterialTheme.typography.labelLarge)
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.clickable {
+                                        scope.launch {
+                                            try {
+                                                permissionsController.providePermission(Permission.CAMERA)
+                                                isCameraOpen = true
+                                            } catch (e: Exception) {
+                                                permissionError = "Permissão de câmera negada."
+                                            }
+                                        }
+                                    }.fillMaxSize(),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(48.dp))
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("Toque para Abrir Câmera", style = MaterialTheme.typography.labelLarge)
+                                    Text("(Obrigatório)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
                     }
 
-                    // Botão de Localização Automática
                     OutlinedCard(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = {
@@ -146,6 +183,12 @@ fun DetailScreen(
                                     val location = locationTracker.getLocationsFlow().first()
                                     currentCoords = location.latitude to location.longitude
                                     locationTracker.stopTracking()
+
+                                    // Busca o endereço automaticamente
+                                    val address = teamViewModel.getAddress(location.latitude, location.longitude)
+                                    if (address != "Local Desconhecido") {
+                                        locationName = address
+                                    }
                                 } catch (e: Exception) {
                                     permissionError = "Permissão de localização negada."
                                 } finally {
@@ -201,11 +244,14 @@ fun DetailScreen(
                         )
                         showCaptureDialog = false
                     },
-                    enabled = currentCoords != null && capturedPhotoPath != null
+                    enabled = currentCoords != null && capturedPhotoPath != null && !isCameraOpen
                 ) { Text("Adicionar ao Time") }
             },
             dismissButton = {
-                TextButton(onClick = { showCaptureDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { 
+                    showCaptureDialog = false
+                    isCameraOpen = false
+                }) { Text("Cancelar") }
             }
         )
     }
@@ -240,16 +286,18 @@ fun DetailScreen(
                 }
                 is DetailUiState.Success -> {
                     val pokemon = state.pokemon
-                    val inTeam = (team as? com.pokedex.app.presentation.screens.team.TeamUiState.Success)
-                        ?.pokemons?.any { it.pokemon.id == pokemon.id } ?: false
+                    val teamMember = (teamState as? com.pokedex.app.presentation.screens.team.TeamUiState.Success)
+                        ?.pokemons?.find { it.pokemon.id == pokemon.id }
                     
-                    val teamFull = (team as? com.pokedex.app.presentation.screens.team.TeamUiState.Success)
+                    val inTeam = teamMember != null
+                    
+                    val teamFull = (teamState as? com.pokedex.app.presentation.screens.team.TeamUiState.Success)
                         ?.let { it.pokemons.size >= 6 && !inTeam } ?: false
                         
                     val headerColor = typeColor(pokemon.types.firstOrNull() ?: "normal")
 
                     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                        DetailHeader(pokemon, headerColor)
+                        DetailHeader(pokemon, headerColor, teamMember?.photoPath)
 
                         Surface(
                             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -263,6 +311,11 @@ fun DetailScreen(
                                 MeasureRow(pokemon)
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
                                 
+                                if (teamMember != null) {
+                                    CaptureRecordCard(teamMember, headerColor)
+                                    Spacer(Modifier.height(16.dp))
+                                }
+
                                 Text("Sobre", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 Text(pokemon.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
 
@@ -275,7 +328,10 @@ fun DetailScreen(
                                 Button(
                                     onClick = {
                                         if (inTeam) teamViewModel.removeFromTeam(pokemon.id)
-                                        else showCaptureDialog = true
+                                        else {
+                                            capturedPhotoPath = null
+                                            showCaptureDialog = true
+                                        }
                                     },
                                     enabled = !teamFull || inTeam,
                                     colors = ButtonDefaults.buttonColors(containerColor = if (inTeam) MaterialTheme.colorScheme.error else headerColor),
@@ -294,9 +350,58 @@ fun DetailScreen(
 }
 
 @Composable
-private fun DetailHeader(pokemon: PokemonDetail, color: Color) {
+private fun DetailHeader(pokemon: PokemonDetail, color: Color, photoPath: String?) {
     Box(modifier = Modifier.fillMaxWidth().height(260.dp).background(Brush.verticalGradient(listOf(color.copy(alpha = 0.9f), color.copy(alpha = 0.4f), Color.Transparent)))) {
+        if (photoPath != null) {
+            AsyncImage(
+                model = photoPath,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().alpha(0.3f)
+            )
+        }
         AsyncImage(model = pokemon.imageUrl, contentDescription = pokemon.name, contentScale = ContentScale.Fit, modifier = Modifier.size(220.dp).align(Alignment.Center))
+    }
+}
+
+@Composable
+private fun CaptureRecordCard(member: TeamMember, color: Color) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (member.photoPath != null) {
+                AsyncImage(
+                    model = member.photoPath,
+                    contentDescription = "Foto da captura",
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(2.dp, color, RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            
+            Spacer(Modifier.width(16.dp))
+            
+            Column {
+                Text("Registro de Captura", style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(4.dp))
+                    Text(member.capturedLocation, style = MaterialTheme.typography.bodyMedium)
+                }
+                if (member.latitude != null) {
+                    Text("GPS: ${member.latitude.toString().take(7)}, ${member.longitude.toString().take(7)}", 
+                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
     }
 }
 

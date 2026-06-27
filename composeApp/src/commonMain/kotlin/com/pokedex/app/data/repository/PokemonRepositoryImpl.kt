@@ -140,9 +140,18 @@ class PokemonRepositoryImpl(
     }
 
     override fun getTeam(): Flow<List<TeamMember>> {
-        // Agora com o import 'kotlinx.coroutines.flow.map', o 'it' será reconhecido
         return teamDao.getAllTeamMembers().map { entities ->
             entities.map { entity -> entity.toDomain() }
+        }
+    }
+
+    override suspend fun getAddressFromCoords(lat: Double, lon: Double): String = withContext(Dispatchers.IO) {
+        try {
+            val response = api.reverseGeocode(lat, lon)
+            response.address?.getBestLocationName() ?: "Local Desconhecido"
+        } catch (e: Exception) {
+            e.printStackTrace()
+            "Local Desconhecido"
         }
     }
 

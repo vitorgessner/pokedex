@@ -62,4 +62,8 @@ class TeamViewModel(
             repository.removeFromTeam(pokemonId)
         }
     }
+
+    suspend fun getAddress(lat: Double, lon: Double): String {
+        return repository.getAddressFromCoords(lat, lon)
+    }
 }

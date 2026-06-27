@@ -60,6 +60,8 @@ kotlin {
             implementation(libs.peekaboo.picker)
             implementation(libs.moko.permissions.core)
             implementation(libs.moko.permissions.ui)
+            implementation(libs.moko.permissions.camera)
+            implementation(libs.moko.permissions.location)
             implementation(libs.moko.geo.core)
             implementation(libs.moko.geo.ui)
         }

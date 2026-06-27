@@ -22,6 +22,8 @@ peekaboo-ui = { module = "io.github.onseok:peekaboo-ui", version.ref = "peekaboo
 peekaboo-picker = { module = "io.github.onseok:peekaboo-image-picker", version.ref = "peekaboo" }
 moko-permissions-core = { module = "dev.icerock.moko:permissions", version.ref = "moko-permissions" }
 moko-permissions-ui = { module = "dev.icerock.moko:permissions-compose", version.ref = "moko-permissions" }
+moko-permissions-camera = { module = "dev.icerock.moko:permissions-camera", version.ref = "moko-permissions" }
+moko-permissions-location = { module = "dev.icerock.moko:permissions-location", version.ref = "moko-permissions" }
 moko-geo-core = { module = "dev.icerock.moko:geo", version.ref = "moko-geo" }
 moko-geo-ui = { module = "dev.icerock.moko:geo-compose", version.ref = "moko-geo" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }

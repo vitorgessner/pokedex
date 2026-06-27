@@ -24,4 +24,6 @@ interface PokemonRepository {
     )
     fun getTeam(): Flow<List<TeamMember>>
     suspend fun removeFromTeam(id: Int)
+    
+    suspend fun getAddressFromCoords(lat: Double, lon: Double): String
 }
