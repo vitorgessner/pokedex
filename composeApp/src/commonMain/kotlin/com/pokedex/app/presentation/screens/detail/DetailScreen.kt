@@ -29,13 +29,16 @@ import com.pokedex.app.presentation.components.TypeBadge
 import com.pokedex.app.presentation.screens.team.TeamViewModel
 import com.pokedex.app.presentation.theme.typeColor
 import dev.icerock.moko.geo.compose.BindLocationTrackerEffect
-import dev.icerock.moko.geo.compose.rememberLocationTracker
+import dev.icerock.moko.geo.compose.LocationTrackerAccuracy
+import dev.icerock.moko.geo.compose.rememberLocationTrackerFactory
 import dev.icerock.moko.permissions.Permission
-import dev.icerock.moko.permissions.compose.BindPermissionsControllerEffect
-import dev.icerock.moko.permissions.compose.rememberPermissionsController
-import io.github.onseok.peekaboo.ui.SelectionMode
-import io.github.onseok.peekaboo.ui.rememberImagePickerLauncher
+import dev.icerock.moko.permissions.compose.BindEffect
+import dev.icerock.moko.permissions.compose.rememberPermissionsControllerFactory
+import dev.icerock.moko.permissions.location.LOCATION
+import com.preat.peekaboo.image.picker.SelectionMode
+import com.preat.peekaboo.image.picker.rememberImagePickerLauncher
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.datetime.Clock
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,11 +53,16 @@ fun DetailScreen(
     val team by teamViewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    // Controllers de Hardware (Moko)
-    val permissionsController = rememberPermissionsController()
-    val locationTracker = rememberLocationTracker()
+    val permissionsControllerFactory = rememberPermissionsControllerFactory()
+    val permissionsController = remember(permissionsControllerFactory) {
+        permissionsControllerFactory.createPermissionsController()
+    }
+    val locationTrackerFactory = rememberLocationTrackerFactory(LocationTrackerAccuracy.Best)
+    val locationTracker = remember(locationTrackerFactory, permissionsController) {
+        locationTrackerFactory.createLocationTracker(permissionsController)
+    }
     
-    BindPermissionsControllerEffect(permissionsController)
+    BindEffect(permissionsController)
     BindLocationTrackerEffect(locationTracker)
 
     var showCaptureDialog by remember { mutableStateOf(false) }
@@ -102,7 +110,6 @@ fun DetailScreen(
                             .clickable {
                                 scope.launch {
                                     try {
-                                        permissionsController.providePermission(Permission.CAMERA)
                                         cameraLauncher.launch()
                                     } catch (e: Exception) {
                                         permissionError = "Permissão de câmera negada."
@@ -136,13 +143,9 @@ fun DetailScreen(
                                     isCapturingLocation = true
                                     permissionsController.providePermission(Permission.LOCATION)
                                     locationTracker.startTracking()
-                                    // Aguarda uma localização válida
-                                    locationTracker.getLocationFlow().collect { loc: dev.icerock.moko.geo.Location? ->
-                                        if (loc != null) {
-                                            currentCoords = loc.coordinates.latitude to loc.coordinates.longitude
-                                            locationTracker.stopTracking()
-                                        }
-                                    }
+                                    val location = locationTracker.getLocationsFlow().first()
+                                    currentCoords = location.latitude to location.longitude
+                                    locationTracker.stopTracking()
                                 } catch (e: Exception) {
                                     permissionError = "Permissão de localização negada."
                                 } finally {
