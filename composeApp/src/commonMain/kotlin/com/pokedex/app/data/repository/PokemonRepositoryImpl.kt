@@ -60,7 +60,10 @@ class PokemonRepositoryImpl(
             imageUrl = imageUrl,
             types = types.split(",").filter { it.isNotBlank() }
         ),
-        capturedLocation = capturedLocation
+        capturedLocation = capturedLocation,
+        latitude = latitude,
+        longitude = longitude,
+        photoPath = photoPath
     )
 
     private suspend fun syncInitialData() {
@@ -112,13 +115,22 @@ class PokemonRepositoryImpl(
         )
     }
 
-    override suspend fun addToTeam(pokemon: PokemonDetail, location: String) {
+    override suspend fun addToTeam(
+        pokemon: PokemonDetail,
+        location: String,
+        latitude: Double?,
+        longitude: Double?,
+        photoPath: String?
+    ) {
         val entity = TeamEntity(
             id = pokemon.id,
             name = pokemon.name,
             imageUrl = pokemon.imageUrl,
             types = pokemon.types.joinToString(","),
-            capturedLocation = location
+            capturedLocation = location,
+            latitude = latitude,
+            longitude = longitude,
+            photoPath = photoPath
         )
         teamDao.insertTeamMember(entity)
     }

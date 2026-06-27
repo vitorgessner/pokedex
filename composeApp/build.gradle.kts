@@ -48,12 +48,20 @@ kotlin {
             implementation(libs.lifecycle.viewmodel)
             implementation(libs.lifecycle.viewmodel.compose)
             implementation(libs.lifecycle.runtime.compose)
+            implementation(libs.kotlinx.datetime)
 
             implementation(libs.room.runtime)
             implementation(libs.sqlite.bundled)
 
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor)
+
+            implementation(libs.peekaboo.ui)
+            implementation(libs.peekaboo.picker)
+            implementation(libs.moko.permissions.core)
+            implementation(libs.moko.permissions.ui)
+            implementation(libs.moko.geo.core)
+            implementation(libs.moko.geo.ui)
         }
 
         androidMain.dependencies {

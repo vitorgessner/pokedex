@@ -15,7 +15,13 @@ interface PokemonRepository {
 
     suspend fun getPokemonDetail(id: Int): PokemonDetail
 
-    suspend fun addToTeam(pokemon: PokemonDetail, location: String)
+    suspend fun addToTeam(
+        pokemon: PokemonDetail,
+        location: String,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        photoPath: String? = null
+    )
     fun getTeam(): Flow<List<TeamMember>>
     suspend fun removeFromTeam(id: Int)
 }

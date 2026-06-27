@@ -1,13 +1,16 @@
 package com.pokedex.app.presentation.screens.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
@@ -26,6 +28,15 @@ import com.pokedex.app.presentation.components.StatBar
 import com.pokedex.app.presentation.components.TypeBadge
 import com.pokedex.app.presentation.screens.team.TeamViewModel
 import com.pokedex.app.presentation.theme.typeColor
+import dev.icerock.moko.geo.compose.BindLocationTrackerEffect
+import dev.icerock.moko.geo.compose.rememberLocationTracker
+import dev.icerock.moko.permissions.Permission
+import dev.icerock.moko.permissions.compose.BindPermissionsControllerEffect
+import dev.icerock.moko.permissions.compose.rememberPermissionsController
+import io.github.onseok.peekaboo.ui.SelectionMode
+import io.github.onseok.peekaboo.ui.rememberImagePickerLauncher
+import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,61 +48,161 @@ fun DetailScreen(
 ) {
     val uiState by detailViewModel.uiState.collectAsStateWithLifecycle()
     val team by teamViewModel.uiState.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
+    // Controllers de Hardware (Moko)
+    val permissionsController = rememberPermissionsController()
+    val locationTracker = rememberLocationTracker()
+    
+    BindPermissionsControllerEffect(permissionsController)
+    BindLocationTrackerEffect(locationTracker)
 
     var showCaptureDialog by remember { mutableStateOf(false) }
-    var captureInput by remember { mutableStateOf("") }
-    var pendingPokemon by remember { mutableStateOf<PokemonDetail?>(null) }
+    var capturedPhotoPath by remember { mutableStateOf<String?>(null) }
+    var currentCoords by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var locationName by remember { mutableStateOf("") }
+    var isCapturingLocation by remember { mutableStateOf(false) }
+    var permissionError by remember { mutableStateOf<String?>(null) }
+
+    val cameraLauncher = rememberImagePickerLauncher(
+        selectionMode = SelectionMode.Single,
+        scope = scope,
+        onResult = { byteArrays: List<ByteArray> ->
+            if (byteArrays.isNotEmpty()) {
+                scope.launch {
+                    val fileName = "photo_${pokemonId}_${Clock.System.now().toEpochMilliseconds()}.jpg"
+                    val path = com.pokedex.app.di.AppModule.imageStorage.saveImage(fileName, byteArrays.first())
+                    capturedPhotoPath = path
+                }
+            }
+        }
+    )
 
     LaunchedEffect(pokemonId) {
         detailViewModel.loadPokemon(pokemonId)
     }
 
-    if (showCaptureDialog && pendingPokemon != null) {
+    if (showCaptureDialog && uiState is DetailUiState.Success) {
+        val pokemon = (uiState as DetailUiState.Success).pokemon
         AlertDialog(
-            onDismissRequest = {
-                showCaptureDialog = false
-                captureInput      = ""
-                pendingPokemon    = null
-            },
-            icon  = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-            title = { Text("Onde você capturou este Pokémon?") },
-            text  = {
-                Column {
-                    Text(
-                        text  = "Informe o local de captura antes de adicioná-lo ao time.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(12.dp))
+            onDismissRequest = { showCaptureDialog = false },
+            title = { Text("Capturar Pokémon", style = MaterialTheme.typography.headlineSmall) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (permissionError != null) {
+                        Text(permissionError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    // Preview da Foto / Botão de Câmera
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .border(2.dp, typeColor(pokemon.types.firstOrNull() ?: "normal"), RoundedCornerShape(12.dp))
+                            .clickable {
+                                scope.launch {
+                                    try {
+                                        permissionsController.providePermission(Permission.CAMERA)
+                                        cameraLauncher.launch()
+                                    } catch (e: Exception) {
+                                        permissionError = "Permissão de câmera negada."
+                                    }
+                                }
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            if (capturedPhotoPath != null) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.CameraAlt, null, tint = MaterialTheme.colorScheme.primary)
+                                    Text("Foto capturada!", color = MaterialTheme.colorScheme.primary)
+                                }
+                            } else {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(40.dp))
+                                    Text("Tirar Foto do Treinador", style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        }
+                    }
+
+                    // Botão de Localização Automática
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    isCapturingLocation = true
+                                    permissionsController.providePermission(Permission.LOCATION)
+                                    locationTracker.startTracking()
+                                    // Aguarda uma localização válida
+                                    locationTracker.getLocationFlow().collect { loc: dev.icerock.moko.geo.Location? ->
+                                        if (loc != null) {
+                                            currentCoords = loc.coordinates.latitude to loc.coordinates.longitude
+                                            locationTracker.stopTracking()
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    permissionError = "Permissão de localização negada."
+                                } finally {
+                                    isCapturingLocation = false
+                                }
+                            }
+                        }
+                    ) {
+                        Row(
+                            Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.MyLocation, null, tint = if (currentCoords != null) MaterialTheme.colorScheme.primary else LocalContentColor.current)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    if (currentCoords != null) "Coordenadas Obtidas" else "Obter GPS atual",
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                if (currentCoords != null) {
+                                    Text(
+                                        "Lat: ${currentCoords?.first}, Lon: ${currentCoords?.second}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            if (isCapturingLocation) {
+                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
-                        value         = captureInput,
-                        onValueChange = { captureInput = it },
-                        label         = { Text("Local de captura") },
-                        placeholder   = { Text("Ex: Kanto City...") },
-                        singleLine    = true,
-                        modifier      = Modifier.fillMaxWidth()
+                        value = locationName,
+                        onValueChange = { locationName = it },
+                        label = { Text("Nome da Cidade/Local") },
+                        placeholder = { Text("Ex: Pallet Town") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
                     )
                 }
             },
             confirmButton = {
-                TextButton(
-                    enabled = captureInput.isNotBlank(),
+                Button(
                     onClick = {
-                        pendingPokemon?.let { pokemon ->
-                            teamViewModel.addToTeam(pokemon, captureInput.trim())
-                        }
+                        teamViewModel.addToTeam(
+                            pokemon = pokemon,
+                            capturedLocation = locationName.ifBlank { "Local Desconhecido" },
+                            latitude = currentCoords?.first,
+                            longitude = currentCoords?.second,
+                            photoPath = capturedPhotoPath
+                        )
                         showCaptureDialog = false
-                        captureInput      = ""
-                        pendingPokemon    = null
-                    }
-                ) { Text("Confirmar") }
+                    },
+                    enabled = currentCoords != null && capturedPhotoPath != null
+                ) { Text("Adicionar ao Time") }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showCaptureDialog = false
-                    captureInput      = ""
-                    pendingPokemon    = null
-                }) { Text("Cancelar") }
+                TextButton(onClick = { showCaptureDialog = false }) { Text("Cancelar") }
             }
         )
     }
@@ -105,9 +216,7 @@ fun DetailScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { paddingValues ->
@@ -118,19 +227,14 @@ fun DetailScreen(
                         CircularProgressIndicator()
                     }
                 }
-
                 is DetailUiState.Error -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(state.message, color = MaterialTheme.colorScheme.error)
-                            Spacer(Modifier.height(16.dp))
-                            Button(onClick = { detailViewModel.loadPokemon(pokemonId) }) {
-                                Text("Tentar Novamente")
-                            }
+                            Button(onClick = { detailViewModel.loadPokemon(pokemonId) }) { Text("Tentar Novamente") }
                         }
                     }
                 }
-
                 is DetailUiState.Success -> {
                     val pokemon = state.pokemon
                     val inTeam = (team as? com.pokedex.app.presentation.screens.team.TeamUiState.Success)
@@ -141,111 +245,41 @@ fun DetailScreen(
                         
                     val headerColor = typeColor(pokemon.types.firstOrNull() ?: "normal")
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(260.dp)
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            headerColor.copy(alpha = 0.95f),
-                                            headerColor.copy(alpha = 0.50f),
-                                            Color.Transparent
-                                        )
-                                    )
-                                )
-                        ) {
-                            AsyncImage(
-                                model = pokemon.imageUrl,
-                                contentDescription = pokemon.name,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .size(200.dp)
-                                    .align(Alignment.Center)
-                            )
-                        }
+                    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        DetailHeader(pokemon, headerColor)
 
                         Surface(
                             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                             modifier = Modifier.fillMaxWidth().offset(y = (-20).dp)
                         ) {
                             Column(modifier = Modifier.padding(24.dp)) {
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = pokemon.name.replaceFirstChar { it.uppercase() },
-                                        fontSize = 28.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "#${pokemon.id.toString().padStart(3, '0')}",
-                                        fontSize = 20.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
-                                ) {
+                                DetailTitleRow(pokemon)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
                                     pokemon.types.forEach { TypeBadge(it) }
                                 }
-
                                 MeasureRow(pokemon)
-
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                                
+                                Text("Sobre", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text(pokemon.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
 
-                                Text("Sobre", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = pokemon.description,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    lineHeight = 22.sp,
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
-                                )
-
-                                Text("Status Base", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text("Status Base", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.height(8.dp))
-                                pokemon.stats.forEach { stat ->
-                                    StatBar(name = stat.name, value = stat.value)
-                                }
+                                pokemon.stats.forEach { StatBar(name = it.name, value = it.value) }
 
-                                Spacer(Modifier.height(24.dp))
+                                Spacer(Modifier.height(32.dp))
 
                                 Button(
                                     onClick = {
                                         if (inTeam) teamViewModel.removeFromTeam(pokemon.id)
-                                        else {
-                                            pendingPokemon = pokemon
-                                            showCaptureDialog = true
-                                        }
+                                        else showCaptureDialog = true
                                     },
                                     enabled = !teamFull || inTeam,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (inTeam) MaterialTheme.colorScheme.error
-                                        else headerColor
-                                    ),
-                                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                                    colors = ButtonDefaults.buttonColors(containerColor = if (inTeam) MaterialTheme.colorScheme.error else headerColor),
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = RoundedCornerShape(16.dp)
                                 ) {
-                                    Text(
-                                        text = when {
-                                            inTeam -> "Remover do Time"
-                                            teamFull -> "Time Completo (6/6)"
-                                            else -> "Adicionar ao Time"
-                                        },
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
-                                    )
+                                    Text(if (inTeam) "Remover do Time" else if (teamFull) "Time Completo" else "Capturar e Adicionar", fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -257,21 +291,31 @@ fun DetailScreen(
 }
 
 @Composable
-private fun MeasureRow(pokemon: PokemonDetail) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        MeasureItem(label = "Altura", value = "${pokemon.heightM} m")
-        VerticalDivider(modifier = Modifier.height(40.dp))
-        MeasureItem(label = "Peso", value = "${pokemon.weightKg} kg")
+private fun DetailHeader(pokemon: PokemonDetail, color: Color) {
+    Box(modifier = Modifier.fillMaxWidth().height(260.dp).background(Brush.verticalGradient(listOf(color.copy(alpha = 0.9f), color.copy(alpha = 0.4f), Color.Transparent)))) {
+        AsyncImage(model = pokemon.imageUrl, contentDescription = pokemon.name, contentScale = ContentScale.Fit, modifier = Modifier.size(220.dp).align(Alignment.Center))
     }
 }
 
 @Composable
-private fun MeasureItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Text(text = label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun DetailTitleRow(pokemon: PokemonDetail) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(text = pokemon.name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+        Text(text = "#${pokemon.id.toString().padStart(3, '0')}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun MeasureRow(pokemon: PokemonDetail) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = "${pokemon.heightM} m", fontWeight = FontWeight.Bold)
+            Text(text = "Altura", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        VerticalDivider(modifier = Modifier.height(40.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = "${pokemon.weightKg} kg", fontWeight = FontWeight.Bold)
+            Text(text = "Peso", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

@@ -85,12 +85,12 @@ actual fun PlatformTeamContent(
                 verticalArrangement = Arrangement.spacedBy(1.dp),
                 modifier            = Modifier.fillMaxSize()
             ) {
-                items(pokemons, key = { it.pokemon.id }) { pokemon ->
+                items(pokemons, key = { it.pokemon.id }) { member ->
                     IOSTeamRow(
-                        pokemon  = pokemon.pokemon,
-                        isFirst  = pokemons.indexOf(pokemon) == 0,
-                        isLast   = pokemons.indexOf(pokemon) == pokemons.lastIndex,
-                        onRemove = { onRemove(pokemon.pokemon.id) }
+                        member   = member,
+                        isFirst  = pokemons.indexOf(member) == 0,
+                        isLast   = pokemons.indexOf(member) == pokemons.lastIndex,
+                        onRemove = { onRemove(member.pokemon.id) }
                     )
                 }
             }
@@ -100,11 +100,12 @@ actual fun PlatformTeamContent(
 
 @Composable
 private fun IOSTeamRow(
-    pokemon: PokemonDetail,
+    member: TeamMember,
     isFirst: Boolean,
     isLast: Boolean,
     onRemove: () -> Unit
 ) {
+    val pokemon    = member.pokemon
     val typeClr    = typeColor(pokemon.types.firstOrNull() ?: "normal")
     val topRadius  = if (isFirst) 12.dp else 0.dp
     val botRadius  = if (isLast)  12.dp else 0.dp
@@ -157,6 +158,19 @@ private fun IOSTeamRow(
                     fontSize = 13.sp,
                     color    = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Text(
+                    text     = "Em: ${member.capturedLocation}",
+                    fontSize = 11.sp,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+                if (member.photoPath != null) {
+                    Text(
+                        text     = "📸 Foto disponível",
+                        fontSize = 10.sp,
+                        color    = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
 
             TextButton(

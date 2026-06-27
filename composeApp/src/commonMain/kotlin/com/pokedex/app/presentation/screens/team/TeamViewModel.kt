@@ -12,8 +12,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class TeamMember(
-    val pokemon: Pokemon,
-    val capturedLocation: String
+    val pokemon: com.pokedex.app.domain.model.Pokemon,
+    val capturedLocation: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val photoPath: String? = null
 )
 sealed interface TeamUiState {
     data class Success(val pokemons: List<TeamMember>) : TeamUiState
@@ -35,7 +38,13 @@ class TeamViewModel(
     }
 
 
-    fun addToTeam(pokemon: PokemonDetail, capturedLocation: String) {
+    fun addToTeam(
+        pokemon: PokemonDetail,
+        capturedLocation: String,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        photoPath: String? = null
+    ) {
         viewModelScope.launch {
             val currentState = _uiState.value
             if (currentState is TeamUiState.Success) {
@@ -44,7 +53,7 @@ class TeamViewModel(
 
                 if (alreadyIn || isFull) return@launch
             }
-            repository.addToTeam(pokemon, capturedLocation)
+            repository.addToTeam(pokemon, capturedLocation, latitude, longitude, photoPath)
         }
     }
 

@@ -11,8 +11,19 @@ ksp                   = "2.1.0-1.0.29"
 room                = "2.7.0-alpha13"
 sqlite              = "2.5.0-alpha13"
 coil                  = "3.1.0"
+peekaboo            = "0.5.2"
+moko-permissions    = "0.20.1"
+moko-geo            = "0.8.0"
+kotlinx-datetime    = "0.6.1"
 
 [libraries]
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+peekaboo-ui = { module = "io.github.onseok:peekaboo-ui", version.ref = "peekaboo" }
+peekaboo-picker = { module = "io.github.onseok:peekaboo-image-picker", version.ref = "peekaboo" }
+moko-permissions-core = { module = "dev.icerock.moko:permissions", version.ref = "moko-permissions" }
+moko-permissions-ui = { module = "dev.icerock.moko:permissions-compose", version.ref = "moko-permissions" }
+moko-geo-core = { module = "dev.icerock.moko:geo", version.ref = "moko-geo" }
+moko-geo-ui = { module = "dev.icerock.moko:geo-compose", version.ref = "moko-geo" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }

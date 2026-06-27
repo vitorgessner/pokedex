@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -151,6 +152,26 @@ private fun MaterialTeamCard(teamMember: TeamMember, onRemove: () -> Unit) {
                         fontSize = 12.sp,
                         color = Color.White.copy(0.85f)
                     )
+                }
+
+                if (teamMember.photoPath != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.PhotoCamera,
+                            contentDescription = null,
+                            tint = Color.White.copy(0.85f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Foto arquivada",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(0.85f)
+                        )
+                    }
                 }
             }
 

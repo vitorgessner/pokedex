@@ -10,4 +10,7 @@ data class TeamEntity(
     val imageUrl: String,
     val capturedLocation: String,
     val types: String,
-    )
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val photoPath: String? = null
+)
